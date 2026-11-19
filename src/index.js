@@ -1,16 +1,25 @@
 import express from "express";
 import multer from "multer";
-import { dirname, join } from "path";
-import { fileURLToPath } from "url";
+import { dirname, join, extname } from "node:path";
+import { fileURLToPath } from "node:url";
+import { randomUUID } from "node:crypto"; // Importa el módulo crypto para generar nombres de archivo únicos
 
 import { notFoundHandler, globalErrorHandler } from "./middlewares/errorHandler.js"; // Importa el manejador de errores 404 y el global
 
 // CURR_DIR es el directoria actual
 const CURR_DIR = dirname(fileURLToPath(import.meta.url)); // Carpeta actual del archivo index.js
+const UPLOADS_DIR = join(CURR_DIR, "../uploads");
 const MIMETYPES = ["image/jpeg", "image/png", "image/gif"]; // Tipos de archivos permitidos
 const multerUploads = multer(
     {
-        dest: join(CURR_DIR, "../uploads"), // Carpeta donde se guardarán los archivos subidos
+        storage: multer.diskStorage({
+            destination: UPLOADS_DIR, // Carpeta donde se guardarán los archivos subidos
+            filename: (req, file, cb) => {
+                const uniqueSuffix = randomUUID().slice(0, 8); // Genera un nombre de archivo único
+                const extension = extname(file.originalname);
+                cb(null, `${file.originalname}-${uniqueSuffix}${extension}`);
+            }
+        }),
         limits: { fileSize: 2000000 }, // Limite de tamaño de archivo (2MB)
         // el callback es el que filtra, si todo sale bien se llama con null y true, si hay un error se llama con un error y false
         fileFilter: (req, file, cb) => {
@@ -44,7 +53,22 @@ app.post("/upload-multiple", multerUploads.array("files", 3), (req, res, next) =
     res.json({ message: "Files uploaded successfully", data: req.files });
 });
 
+app.get("/downloads/:filename", (req, res, next) => {
+    const { filename } = req.params;
 
+    // Enviamos el archivo como adjunto. El segundo argumento es el objeto de opciones.
+    // Con root, Express busca el archivo dentro de uploads y valida que la ruta quede ahí.
+    res.download(filename, { root: UPLOADS_DIR }, (err) => {
+        if (err?.code === "ENOENT") {
+            const error = new Error("File not found", { cause: err });
+            error.status = 404;
+            return next(error);
+        }
+        if (err) {
+            next(err);
+        }
+    });
+});
 
 // registramos al final de la cadena los manejadores de errores
 app.use(notFoundHandler); // Manejador de errores 404

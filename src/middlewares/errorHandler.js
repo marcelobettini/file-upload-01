@@ -3,6 +3,9 @@ export function notFoundHandler(req, res) {
 }
 
 export function globalErrorHandler(err, req, res, next) {
+    if (res.headersSent) {
+        return next(err);
+    }
 
     if (err.code === 'LIMIT_FILE_SIZE') {
         return res.status(413).json({

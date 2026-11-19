@@ -54,3 +54,13 @@ Con el servidor corriendo en `http://localhost:3000`, armamos una solicitud `POS
 
 Multer usa `LIMIT_UNEXPECTED_FILE` tanto para un campo incorrecto como para un exceso de archivos. En el manejador comparamos el nombre que trae `err.field` con el que espera la ruta. Así podemos indicar qué campo usar o cuántos archivos admite esa ruta.
 
+## Descargamos un archivo
+
+Agregamos `GET /downloads/:filename`. Para probarlo, subimos una imagen, copiamos el valor de `filename` que devuelve la subida y lo usamos en la URL de descarga.
+
+En la ruta usamos `res.download(filename, { root: UPLOADS_DIR }, callback)`. El primer argumento es el nombre con el que guardamos el archivo. Express lo envía como adjunto con el encabezado `Content-Disposition`.
+
+El segundo argumento, `{ root: UPLOADS_DIR }`, es un objeto de opciones. `root` indica desde qué carpeta se resuelve el primer argumento. En nuestro caso, es la misma carpeta `uploads` que usa Multer. Así podemos pasar solo el nombre del archivo y Express verifica que la ruta resultante quede dentro de esa carpeta.
+
+El tercer argumento es el callback de la descarga. Si el archivo no existe, recibimos `ENOENT` y le pasamos a Express un error con estado `404`. El manejador global responde con `File not found`.
+
