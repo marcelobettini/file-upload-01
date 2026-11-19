@@ -1,4 +1,20 @@
-﻿## Etapa 1 · Subimos un archivo
+﻿# Tutorial de subida de archivos con Express y Multer
+Este tutorial muestra cómo subir archivos a un servidor Express usando Multer. Incluye ejemplos de subida de un solo archivo, varios archivos, validación de tipo y tamaño, y descarga de archivos.
+
+En la rama `main` está el código completo. Para ir viendo por etapas te puse tags de git en commits puntuales, podés ir cambiandote como si fuera ramas, con el comando `git checkout <tag>`.
+
+Los tags son:
+- `etapa-1` · Subimos un archivo
+- `etapa-2` · Subimos varios archivos
+- `etapa-3` · Guardamos con un nombre nuevo y descargamos archivos en un endpoint específico
+
+El tutorial es para que te enfoques en la subida de archivos y por eso está escrito casi íntegramente en el `index.js` del proyecto, así no te distraés yendo y viniendo entre archivos. En un proyecto real conviene separar por capas.
+
+---
+
+
+
+## Etapa 1 · Subimos un archivo
 
 ```bash
 git checkout etapa-1
@@ -54,13 +70,31 @@ Con el servidor corriendo en `http://localhost:3000`, armamos una solicitud `POS
 
 Multer usa `LIMIT_UNEXPECTED_FILE` tanto para un campo incorrecto como para un exceso de archivos. En el manejador comparamos el nombre que trae `err.field` con el que espera la ruta. Así podemos indicar qué campo usar o cuántos archivos admite esa ruta.
 
-## Descargamos un archivo
+## Etapa 3 · Guardamos con un nombre nuevo y descargamos el archivo
 
-Agregamos `GET /downloads/:filename`. Para probarlo, subimos una imagen, copiamos el valor de `filename` que devuelve la subida y lo usamos en la URL de descarga.
+```bash
+git checkout etapa-3
+```
+
+### Elegimos cómo guardar el archivo
+
+Hasta acá usábamos `dest` para decirle a Multer en qué carpeta guardar los archivos. Con esa configuración, Multer generaba un nombre sin extensión. Para definir también el nombre con el que se guarda cada archivo, reemplazamos `dest` por la opción `storage` y le pasamos un `multer.diskStorage(...)`.
+
+En `diskStorage`, `destination` apunta a `UPLOADS_DIR`, la carpeta `uploads` del proyecto. En el callback `filename`, tomamos el nombre original completo, le agregamos un guion y los primeros ocho caracteres de un UUID, y volvemos a agregar la extensión que obtenemos con `extname`. Por ejemplo, `foto.png` puede quedar como `foto.png-a1b2c3d4.png`. El sufijo reduce la posibilidad de que dos subidas con el mismo nombre se pisen. Multer devuelve el nombre guardado en `filename` y el nombre de origen en `originalname`.
+
+### Descargamos un archivo
+
+Agregamos `GET /downloads/:filename` para recuperar un archivo por su nombre guardado.
 
 En la ruta usamos `res.download(filename, { root: UPLOADS_DIR }, callback)`. El primer argumento es el nombre con el que guardamos el archivo. Express lo envía como adjunto con el encabezado `Content-Disposition`.
 
 El segundo argumento, `{ root: UPLOADS_DIR }`, es un objeto de opciones. `root` indica desde qué carpeta se resuelve el primer argumento. En nuestro caso, es la misma carpeta `uploads` que usa Multer. Así podemos pasar solo el nombre del archivo y Express verifica que la ruta resultante quede dentro de esa carpeta.
 
-El tercer argumento es el callback de la descarga. Si el archivo no existe, recibimos `ENOENT` y le pasamos a Express un error con estado `404`. El manejador global responde con `File not found`.
+El tercer argumento es el callback de la descarga. Si recibimos `ENOENT`, creamos un error con estado `404` y lo pasamos con `next(error)`. El manejador global responde con `{"error":"File not found"}`. Los demás errores también se pasan con `next`. Si la transferencia ya empezó y se enviaron los encabezados, el manejador global delega el error a Express porque la respuesta ya está en curso.
+
+### Probamos la subida y la descarga
+
+1. Subimos dos veces la misma imagen con `POST /upload-one`. En las respuestas, `originalname` es el mismo y cada `filename` tiene su propio sufijo.
+2. Copiamos uno de los valores de `filename` y lo usamos en `GET /downloads/:filename`. Esperamos un `200` con el archivo como adjunto.
+3. Cambiamos el nombre en la URL por uno que no exista. Esperamos un `404` con el mensaje `File not found`.
 
